@@ -34,14 +34,8 @@ The method compares the reference and candidate posteriors using the Fisher dive
 
 $$
 \mathrm{FD}(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda)
-=
-\mathbb E_{\theta\sim\widetilde\Pi_{\mathrm{ref}}}
-\left[
-\left\|
-s_{\widetilde\pi_{\mathrm{ref}}}(\theta)
--s_{\widetilde\pi^\lambda}(\theta)
-\right\|^2
-\right].
+=\mathbb E_{\theta\sim\widetilde\Pi_{\mathrm{ref}}}\left[\left\|
+s_{\widetilde\pi_{\mathrm{ref}}}(\theta)-s_{\widetilde\pi^\lambda}(\theta)\right\|^2\right].
 $$
 
 Intuitively, the FD measures how differently the two posteriors behave across the region occupied by the reference posterior.
@@ -50,14 +44,8 @@ A value of zero means that the candidate and reference posteriors coincide. Larg
 For any candidate $\lambda$, the FD is estimated using the reference-posterior samples:
 $$
 \widehat{\mathrm{FD}}_m
-(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda)
-=
-\frac{1}{m}
-\sum_{i=1}^m
-\left\|
-s_{\widetilde\pi_{\mathrm{ref}}}(\theta_i)
--s_{\widetilde\pi^\lambda}(\theta_i)
-\right\|^2.
+(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda)=
+\frac{1}{m}\sum_{i=1}^m\left\|s_{\widetilde\pi_{\mathrm{ref}}}(\theta_i)-s_{\widetilde\pi^\lambda}(\theta_i)\right\|^2.
 $$
 The same reference samples are reused for every candidate. Evaluating a new candidate therefore requires score evaluations but not a new posterior fit.
 
@@ -68,8 +56,7 @@ $$
 =
 \sup_{\lambda\in\Gamma}
 \widehat{\mathrm{FD}}_m
-(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda) -
-\inf_{\lambda\in\Gamma}
+(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda) -\inf_{\lambda\in\Gamma}
 \widehat{\mathrm{FD}}_m
 (\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda).
 $$

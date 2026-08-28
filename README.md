@@ -38,11 +38,46 @@ the black-box optimisation algorithm `optimization = "black_box"`.
 
 `fd_lr_global_sensitivity()` computes the learning-rate sensitivity.
 
+## Algorithm
+
+1. **Prepare a reference Bayesian model as a `.stan` file** (prior + likelihood/loss). Put it e.g. under `inst/stan/` and fit it with `cmdstanr::cmdstan_model()$sample()` to obtain the reference posterior draws (`CmdStanMCMC`).
+2. **Choose the sensitivity analysis route**: prior sensitivity (`fd_prior_global_sensitivity()`) or learning-rate sensitivity (`fd_lr_global_sensitivity()`).
+3. **If prior sensitivity:**
+   - Choose whether the prior is exponential family. With `method = "auto"` (default) this is detected automatically. Choose `method = "quadratic"` when you are sure that it is exponential family, `method = "black_box"` - when not.
+   - When `method = "auto"` or `method = "black_box"`, supply score functions `score_prior_ref(draws)` and `score_prior_candidate(draws, lambda)`, each returning a numeric matrix of the same shape as `draws` (one row per posterior draw, one column per variable) holding the gradient of the log-prior density with respect to the parameters. 
+   - Choose candidate prior hyperparameters $\lambda$ range - the box `lambda_lower` / `lambda_upper`.
+   - Run `fd_prior_global_sensitivity(...)`.
+4. **If learning-rate sensitivity:** 
+   - Choose `lambda_ref` and the `lower` / `upper` interval.
+   - Supply `score_loss`.
+   - Run `fd_lr_global_sensitivity(...)`.
+5. **Receive results**: an `fd_sensitivity_result` object (print it, or access fields directly):
+   - `fd_sensitivity_result$sensitivity` — the global sensitivity value $\widehat{S}_m^{\mathrm{FD}}(\Gamma)$, i.e. `fd_max - fd_min`;
+   - `fd_sensitivity_result$lambda_max` — the worst-case hyperparameters $\lambda_{\sup}$, leading to largest posterior change;
+   - `fd_sensitivity_result$lambda_min` — the least-sensitive hyperparameters $\lambda_{\inf}$, leading to smallest posterior change;
+   - `fd_sensitivity_result$fd_max` / `fd_sensitivity_result$fd_min` — the FD estimates at `lambda_max` / `lambda_min`;
+   - `fd_sensitivity_result$interval` — the searched box (`lower`, `upper`) that was passed in;
+   - `fd_sensitivity_result$analysis` — `"prior"` or `"learning_rate"`;
+   - `fd_sensitivity_result$draws` — the reference-posterior draws used for the estimate.
+
+See [`GETTING_STARTED.md`](GETTING_STARTED.md) for the underlying methodology.
+
 ## Complete examples
 
-- [`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R): automatic Gaussian quadratic route;
+- [`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R): automatic Gaussian quadratic route, then interprets the result (see below);
 - [`examples/gaussian_location_prior_sensitivity_multidim.R`](examples/gaussian_location_prior_sensitivity_multidim.R): explicit black-box route;
 - [`examples/gaussian_location_lr_sensitivity.R`](examples/gaussian_location_lr_sensitivity.R): learning-rate sensitivity.
+
+## Interpreting results
+
+[`interpretation/plots.R`](interpretation/plots.R) provides reusable helpers, writing output into a directory:
+
+- `save_sensitivity_result(result, output_dir)` — writes an `fd_sensitivity_result`'s values (`sensitivity`, `lambda_min`/`lambda_max`, `fd_min`/`fd_max`, `interval`, `analysis`, ...) as a JSON dict, leaving out draw-level fields;
+- `plot_quantiles(fits, variables, output_dir)` — writes a posterior-quantile table (`.csv`) and a median/90%-interval plot (`.png`) comparing a named list of `CmdStanMCMC` fits (e.g. `list(reference = ref_fit, candidate = cand_fit)`);
+- `plot_kde(fits, variables, output_dir)` — writes a kernel density estimate comparison (`.png`) across those fits;
+- `plot_ecdf(fits, variables, output_dir)` — writes an empirical CDF comparison (`.png`) across those fits.
+
+[`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R) demonstrates this: after `fd_prior_global_sensitivity()` it refits the Stan model at the worst-case `lambda_max` and calls all four helpers above. Requires the `ggplot2`, `jsonlite`, and `posterior` packages.
 
 ## Contributing
 

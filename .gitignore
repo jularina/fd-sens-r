@@ -9,5 +9,8 @@ inst/doc
 # IDE
 .idea/
 
+# generated plots/tables from interpretation/ scripts
+interpretation/output/
+
 # OS
 .DS_Store
