@@ -32,12 +32,12 @@ fit_reference <- model$sample(
 
 # The Stan statement `theta ~ normal(prior_mean, prior_sd)` is detected as an
 # exponential-family prior. Bounds are therefore supplied in natural
-# parameters lambda1 = mu / sigma^2 and lambda2 = -1 / (2 sigma^2).
+# parameters eta1 = mu / sigma^2 and eta2 = -1 / (2 sigma^2).
 prior_result <- fd_prior_global_sensitivity(
   fit = fit_reference,
   variables = "theta",
-  lambda_lower = c(lambda1 = -1, lambda2 = -2),
-  lambda_upper = c(lambda1 = 1, lambda2 = -0.05),
+  lambda_lower = c(eta1 = -1, eta2 = -2),
+  lambda_upper = c(eta1 = 1, eta2 = -0.05),
   stan_file = stan_file,
   prior_variable = "theta",
   stan_data = list(prior_mean = prior_mean_ref, prior_sd = prior_sd_ref)
@@ -45,11 +45,11 @@ prior_result <- fd_prior_global_sensitivity(
 print(prior_result)
 
 # `lambda_max` is in the normal prior's natural parameterisation
-# (lambda1 = mu / sigma^2, lambda2 = -1 / (2 sigma^2)); invert it to refit
+# (eta1 = mu / sigma^2, eta2 = -1 / (2 sigma^2)); invert it to refit
 # the candidate model in its original (mu, sigma) parameterisation.
 lambda_max <- prior_result$lambda_max
-sigma_candidate <- sqrt(-1 / (2 * lambda_max["lambda2"]))
-mu_candidate <- lambda_max["lambda1"] * sigma_candidate^2
+sigma_candidate <- sqrt(-1 / (2 * lambda_max["eta2"]))
+mu_candidate <- lambda_max["eta1"] * sigma_candidate^2
 
 fit_candidate <- model$sample(
   data = list(

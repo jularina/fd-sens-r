@@ -176,8 +176,8 @@ test_that("automatic normal route builds the quadratic and checks corners", {
     stan_file
   )
 
-  lower <- c(lambda1 = -1, lambda2 = -1)
-  upper <- c(lambda1 = 1, lambda2 = -0.05)
+  lower <- c(eta1 = -1, eta2 = -1)
+  upper <- c(eta1 = 1, eta2 = -0.05)
   result <- fd_prior_global_sensitivity(
     fit,
     variables = "theta",
@@ -190,7 +190,7 @@ test_that("automatic normal route builds the quadratic and checks corners", {
 
   expect_identical(result$optimization, "quadratic_corner")
   expect_identical(result$prior_family, "normal")
-  expect_equal(result$reference_natural_parameters, c(lambda1 = 0, lambda2 = -0.125))
+  expect_equal(result$reference_natural_parameters, c(eta1 = 0, eta2 = -0.125))
   expect_equal(nrow(result$corners), 4)
   expect_equal(result$fd_max, max(result$corner_fd))
   expect_equal(result$fd_min, 0)
@@ -240,6 +240,67 @@ test_that("quadratic route rejects original-parameter-style normal bounds", {
     ),
     "Natural-parameter bounds must be named"
   )
+})
+
+test_that("independent prior blocks decompose sensitivity and corner counts", {
+  set.seed(8)
+  draws <- cbind(
+    alpha = rnorm(100),
+    `beta[1]` = rnorm(100),
+    sigma = abs(rnorm(100)) + 0.1
+  )
+  fit <- mock_cmdstan_fit(draws, grad_fun = function(u) -u)
+  stan_file <- tempfile(fileext = ".stan")
+  writeLines(
+    paste(
+      "parameters { real alpha; array[1] real beta; real<lower=0> sigma; }",
+      "model { alpha ~ normal(0, 2); beta[1] ~ normal(0, 2);",
+      "sigma ~ cauchy(0, 1); }"
+    ),
+    stan_file
+  )
+  normal_bounds <- list(
+    lambda_lower = c(eta1 = -1, eta2 = -1),
+    lambda_upper = c(eta1 = 1, eta2 = -0.05),
+    candidate_family = "normal"
+  )
+  blocks <- list(
+    alpha = c(
+      list(variables = "alpha", prior_variable = "alpha"),
+      normal_bounds
+    ),
+    beta1 = c(
+      list(variables = "beta[1]", prior_variable = "beta[1]"),
+      normal_bounds
+    ),
+    sigma = list(
+      variables = "sigma",
+      prior_variable = "sigma",
+      candidate_family = "inv_gamma",
+      lambda_lower = c(eta1 = -6, eta2 = -2),
+      lambda_upper = c(eta1 = -2, eta2 = -0.1),
+      score_prior_ref = function(x) {
+        matrix(-2 * x[, "sigma"] / (1 + x[, "sigma"]^2), ncol = 1)
+      }
+    )
+  )
+
+  result <- fd_prior_global_sensitivity(
+    fit,
+    independent = TRUE,
+    blocks = blocks,
+    stan_file = stan_file
+  )
+
+  expect_s3_class(result, "fd_sensitivity_decomposition")
+  expect_equal(result$sensitivity, sum(result$components$sensitivity))
+  expect_equal(result$fd_min, sum(result$components$fd_min))
+  expect_equal(result$fd_max, sum(result$components$fd_max))
+  expect_equal(sum(result$components$corner_evaluations), 12)
+  expect_equal(sum(result$components$sensitivity_share), 1)
+  expect_equal(names(result$lambda_max), names(blocks))
+  expect_identical(result$block_results$beta1$prior_family, "normal")
+  expect_identical(result$block_results$sigma$prior_family, "inv_gamma")
 })
 
 test_that("fd_lr_global_sensitivity uses the analytic learning-rate objective", {

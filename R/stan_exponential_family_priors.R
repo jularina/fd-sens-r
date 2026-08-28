@@ -10,14 +10,21 @@
 #' @export
 stan_exponential_family_priors <- function() {
   data.frame(
-    stan_family = c("normal", "gamma", "beta"),
-    original_parameters = c("mu, sigma", "alpha, beta (shape, rate)", "alpha, beta"),
-    natural_parameters = c(
-      "lambda1 = mu / sigma^2; lambda2 = -1 / (2 sigma^2)",
-      "lambda1 = alpha - 1; lambda2 = -beta",
-      "lambda1 = alpha - 1; lambda2 = beta - 1"
+    stan_family = c("normal", "gamma", "beta", "inv_gamma"),
+    original_parameters = c(
+      "mu, sigma", "alpha, beta (shape, rate)", "alpha, beta",
+      "alpha, beta (shape, scale)"
     ),
-    sufficient_statistics = c("theta, theta^2", "log(theta), theta", "log(theta), log(1-theta)"),
+    natural_parameters = c(
+      "eta1 = mu / sigma^2; eta2 = -1 / (2 sigma^2)",
+      "eta1 = alpha - 1; eta2 = -beta",
+      "eta1 = alpha - 1; eta2 = beta - 1",
+      "eta1 = -(alpha + 1); eta2 = -beta"
+    ),
+    sufficient_statistics = c(
+      "theta, theta^2", "log(theta), theta",
+      "log(theta), log(1-theta)", "log(theta), 1/theta"
+    ),
     stringsAsFactors = FALSE
   )
 }
@@ -40,14 +47,18 @@ stan_prior_info <- function(stan_file, prior_variable, stan_data = list()) {
     stop("`stan_file` must identify an existing Stan program.", call. = FALSE)
   }
   if (length(prior_variable) != 1L ||
-      !grepl("^[A-Za-z][A-Za-z0-9_]*$", prior_variable)) {
-    stop("`prior_variable` must be one simple Stan identifier.", call. = FALSE)
+      !grepl("^[A-Za-z][A-Za-z0-9_]*(\\[[0-9]+\\])?$", prior_variable)) {
+    stop(
+      "`prior_variable` must be a Stan identifier or one fixed indexed entry.",
+      call. = FALSE
+    )
   }
   code <- paste(readLines(stan_file, warn = FALSE), collapse = "\n")
   code <- gsub("(?s)/\\*.*?\\*/", " ", code, perl = TRUE)
   code <- gsub("//[^\n]*", " ", code, perl = TRUE)
+  escaped_variable <- gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", prior_variable)
   pattern <- paste0(
-    "\\b", prior_variable,
+    "\\b", escaped_variable,
     "\\s*~\\s*([A-Za-z][A-Za-z0-9_]*)\\s*\\(([^;()]*)\\)\\s*;"
   )
   locations <- gregexpr(pattern, code, perl = TRUE)
@@ -121,38 +132,50 @@ stan_prior_registry <- function() {
     normal = list(
       n_arguments = 2L,
       original_names = c("mu", "sigma"),
-      natural_names = c("lambda1", "lambda2"),
+      natural_names = c("eta1", "eta2"),
       to_natural = function(x) {
         if (x[2L] <= 0) stop("Normal `sigma` must be positive.", call. = FALSE)
-        c(lambda1 = x[1L] / x[2L]^2, lambda2 = -1 / (2 * x[2L]^2))
+        c(eta1 = x[1L] / x[2L]^2, eta2 = -1 / (2 * x[2L]^2))
       },
       gradient = function(theta) cbind(1, 2 * theta),
       support = function(theta) rep(TRUE, length(theta)),
-      valid_box = function(lower, upper) upper["lambda2"] < 0
+      valid_box = function(lower, upper) upper["eta2"] < 0
     ),
     gamma = list(
       n_arguments = 2L,
       original_names = c("alpha", "beta"),
-      natural_names = c("lambda1", "lambda2"),
+      natural_names = c("eta1", "eta2"),
       to_natural = function(x) {
         if (any(x <= 0)) stop("Gamma shape and rate must be positive.", call. = FALSE)
-        c(lambda1 = x[1L] - 1, lambda2 = -x[2L])
+        c(eta1 = x[1L] - 1, eta2 = -x[2L])
       },
       gradient = function(theta) cbind(1 / theta, 1),
       support = function(theta) theta > 0,
-      valid_box = function(lower, upper) lower["lambda1"] > -1 && upper["lambda2"] < 0
+      valid_box = function(lower, upper) lower["eta1"] > -1 && upper["eta2"] < 0
     ),
     beta = list(
       n_arguments = 2L,
       original_names = c("alpha", "beta"),
-      natural_names = c("lambda1", "lambda2"),
+      natural_names = c("eta1", "eta2"),
       to_natural = function(x) {
         if (any(x <= 0)) stop("Beta shape parameters must be positive.", call. = FALSE)
-        c(lambda1 = x[1L] - 1, lambda2 = x[2L] - 1)
+        c(eta1 = x[1L] - 1, eta2 = x[2L] - 1)
       },
       gradient = function(theta) cbind(1 / theta, -1 / (1 - theta)),
       support = function(theta) theta > 0 & theta < 1,
       valid_box = function(lower, upper) all(lower > -1)
+    ),
+    inv_gamma = list(
+      n_arguments = 2L,
+      original_names = c("alpha", "beta"),
+      natural_names = c("eta1", "eta2"),
+      to_natural = function(x) {
+        if (any(x <= 0)) stop("Inverse-Gamma shape and scale must be positive.", call. = FALSE)
+        c(eta1 = -(x[1L] + 1), eta2 = -x[2L])
+      },
+      gradient = function(theta) cbind(1 / theta, -1 / theta^2),
+      support = function(theta) theta > 0,
+      valid_box = function(lower, upper) upper["eta1"] < -1 && upper["eta2"] < 0
     )
   )
 }
@@ -204,8 +227,16 @@ validate_natural_bounds <- function(lower, upper, registry, family) {
 }
 
 validate_detected_variable <- function(draws, prior_variable) {
-  pattern <- paste0("^", prior_variable, "($|\\[)")
-  if (is.null(colnames(draws)) || any(!grepl(pattern, colnames(draws)))) {
+  if (is.null(colnames(draws))) {
+    stop("Reference draws must have parameter column names.", call. = FALSE)
+  }
+  if (grepl("\\[", prior_variable)) {
+    belongs <- colnames(draws) == prior_variable
+  } else {
+    pattern <- paste0("^", prior_variable, "($|\\[)")
+    belongs <- grepl(pattern, colnames(draws))
+  }
+  if (any(!belongs)) {
     stop(
       "All entries in `variables` must belong to detected prior variable `",
       prior_variable, "`.",
@@ -214,18 +245,38 @@ validate_detected_variable <- function(draws, prior_variable) {
   }
 }
 
-sufficient_statistic_gram <- function(draws, registry) {
+sufficient_statistic_scores <- function(draws, registry, lambda) {
   if (any(!registry$support(as.numeric(draws)))) {
     stop("Reference draws fall outside the detected prior family's support.", call. = FALSE)
   }
-  p <- length(registry$natural_names)
-  A <- matrix(0, nrow = p, ncol = p)
+  scores <- matrix(NA_real_, nrow = nrow(draws), ncol = ncol(draws))
   for (i in seq_len(nrow(draws))) {
     J <- registry$gradient(as.numeric(draws[i, ]))
-    A <- A + crossprod(J)
+    scores[i, ] <- as.numeric(J %*% lambda)
   }
-  A <- A / nrow(draws)
-  dimnames(A) <- list(registry$natural_names, registry$natural_names)
-  A
+  colnames(scores) <- colnames(draws)
+  scores
 }
 
+sufficient_statistic_quadratic <- function(draws, registry, reference_scores) {
+  if (any(!registry$support(as.numeric(draws)))) {
+    stop("Reference draws fall outside the candidate prior family's support.", call. = FALSE)
+  }
+  p <- length(registry$natural_names)
+  A <- matrix(0, nrow = p, ncol = p)
+  b <- numeric(p)
+  c_value <- 0
+  for (i in seq_len(nrow(draws))) {
+    J <- registry$gradient(as.numeric(draws[i, ]))
+    ref <- as.numeric(reference_scores[i, ])
+    A <- A + crossprod(J)
+    b <- b - 2 * as.numeric(crossprod(J, ref))
+    c_value <- c_value + sum(ref^2)
+  }
+  A <- A / nrow(draws)
+  b <- b / nrow(draws)
+  c_value <- c_value / nrow(draws)
+  dimnames(A) <- list(registry$natural_names, registry$natural_names)
+  names(b) <- registry$natural_names
+  list(A = A, b = b, c = c_value)
+}

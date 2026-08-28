@@ -34,6 +34,15 @@ In this case, optimisation is performed using `optimization = "quadratic_corner"
 If the prior cannot be classified as exponential family safely, `method = "auto"` uses 
 the black-box optimisation algorithm `optimization = "black_box"`.
 
+## Sensitivity to independent prior components
+
+If the reference and candidate priors both factorise into disjoint parameter blocks and the candidate region is a Cartesian product across those blocks, set `independent = TRUE` and pass a named `blocks` list instead of `variables`/`lambda_lower`/`lambda_upper`. 
+The total minimum, maximum, and sensitivity are just the sums of each block's own minimum, maximum, and sensitivity, so each block is optimised on its own.
+
+Each block is resolved exactly like a standalone call to `fd_prior_global_sensitivity()`.
+The result is an `fd_sensitivity_decomposition` (which also inherits `fd_sensitivity_result`): `sensitivity`, `fd_min`, `fd_max`, `lambda_min`, and `lambda_max` are the totals (`lambda_min`/`lambda_max` are named lists, one entry per block),
+and `components` is a data frame with one row per block giving its own `sensitivity`, `fd_min`, `fd_max`, and `sensitivity_share`.
+
 ## Learning-rate sensitivity
 
 `fd_lr_global_sensitivity()` computes the learning-rate sensitivity.
@@ -66,18 +75,20 @@ See [`GETTING_STARTED.md`](GETTING_STARTED.md) for the underlying methodology.
 
 - [`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R): automatic Gaussian quadratic route, then interprets the result (see below);
 - [`examples/gaussian_location_prior_sensitivity_multidim.R`](examples/gaussian_location_prior_sensitivity_multidim.R): explicit black-box route;
-- [`examples/gaussian_location_lr_sensitivity.R`](examples/gaussian_location_lr_sensitivity.R): learning-rate sensitivity.
+- [`examples/gaussian_location_lr_sensitivity.R`](examples/gaussian_location_lr_sensitivity.R): learning-rate sensitivity;
+- [`examples/kilpisjarvi_ar5_independent_prior_sensitivity.R`](examples/kilpisjarvi_ar5_independent_prior_sensitivity.R): `rstan` AR(5) analysis with independent-prior decomposition, then interprets the result (see below).
 
 ## Interpreting results
 
 [`interpretation/plots.R`](interpretation/plots.R) provides reusable helpers, writing output into a directory:
 
-- `save_sensitivity_result(result, output_dir)` — writes an `fd_sensitivity_result`'s values (`sensitivity`, `lambda_min`/`lambda_max`, `fd_min`/`fd_max`, `interval`, `analysis`, ...) as a JSON dict, leaving out draw-level fields;
-- `plot_quantiles(fits, variables, output_dir)` — writes a posterior-quantile table (`.csv`) and a median/90%-interval plot (`.png`) comparing a named list of `CmdStanMCMC` fits (e.g. `list(reference = ref_fit, candidate = cand_fit)`);
+- `save_sensitivity_result(result, output_dir)` — writes an `fd_sensitivity_result`'s (or `fd_sensitivity_decomposition`'s) values (`sensitivity`, `lambda_min`/`lambda_max`, `fd_min`/`fd_max`, `interval`, `analysis`, ...) as a JSON dict, leaving out draw-level fields at every nesting level;
+- `plot_quantiles(fits, variables, output_dir)` — writes a posterior-quantile table (`.csv`) and a median/90%-interval plot (`.png`) comparing a named list of `CmdStanMCMC` or `stanfit` fits (e.g. `list(reference = ref_fit, candidate = cand_fit)`);
 - `plot_kde(fits, variables, output_dir)` — writes a kernel density estimate comparison (`.png`) across those fits;
-- `plot_ecdf(fits, variables, output_dir)` — writes an empirical CDF comparison (`.png`) across those fits.
+- `plot_ecdf(fits, variables, output_dir)` — writes an empirical CDF comparison (`.png`) across those fits;
+- `plot_component_shares(result, output_dir)` — for an `fd_sensitivity_decomposition` (from `independent = TRUE`), writes a 100%-stacked bar (`.png`) showing each block's percentage share of the total sensitivity.
 
-[`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R) demonstrates this: after `fd_prior_global_sensitivity()` it refits the Stan model at the worst-case `lambda_max` and calls all four helpers above. Requires the `ggplot2`, `jsonlite`, and `posterior` packages.
+[`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R) demonstrates the fit-comparison helpers: after `fd_prior_global_sensitivity()` it refits the Stan model at the worst-case `lambda_max` and calls `save_sensitivity_result()`, `plot_quantiles()`, `plot_kde()`, and `plot_ecdf()`. [`examples/kilpisjarvi_ar5_independent_prior_sensitivity.R`](examples/kilpisjarvi_ar5_independent_prior_sensitivity.R) demonstrates all five helpers on the independent-block decomposition: `plot_component_shares()` visualises each block's sensitivity share, and after inverting every block's own worst-case `lambda_max` back to its original Stan parameterisation and refitting (against [`inst/stan/kilpisjarvi_ar5_candidate.stan`](inst/stan/kilpisjarvi_ar5_candidate.stan), which takes those prior hyperparameters as data), `plot_quantiles()`/`plot_kde()`/`plot_ecdf()` compare the reference and worst-case posteriors across `alpha`, `beta[1:5]`, and `sigma`. Requires the `ggplot2`, `jsonlite`, and `posterior` packages.
 
 ## Contributing
 
