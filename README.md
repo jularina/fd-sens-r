@@ -79,7 +79,7 @@ prior_result <- fd_prior_global_sensitivity(
 
 ## Complete examples
 
-See [`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R) and [`examples/gaussian_location_lr_sensitivity.R`](examples/gaussian_location_lr_sensitivity.R), each a standalone script fitting the same Stan reference model before running its analysis.
+See [`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R) and [`examples/gaussian_location_lr_sensitivity.R`](examples/gaussian_location_lr_sensitivity.R), each a standalone script fitting the same Stan reference model before running its analysis. [`examples/gaussian_location_prior_multidim.R`](examples/gaussian_location_prior_multidim.R) extends the prior-sensitivity case to a 2-D mean and 2x2 covariance, and shows how to keep the searched covariance box positive definite by construction.
 
 ## Current scope
 
