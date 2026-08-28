@@ -77,8 +77,9 @@ stopifnot(worst_case_det > 0)
 prior_result <- fd_prior_global_sensitivity(
   fit = fit,
   variables = "theta",
-  lower = lower,
-  upper = upper,
+  lambda_lower = lower,
+  lambda_upper = upper,
+  method = "black_box",
   score_prior_ref = score_prior_ref,
   score_prior_candidate = score_prior_candidate
 )

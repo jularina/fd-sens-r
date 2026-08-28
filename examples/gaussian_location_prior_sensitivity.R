@@ -26,26 +26,16 @@ fit <- model$sample(
   refresh = 0
 )
 
-# For prior sensitivity the likelihood is fixed, so only prior scores are
-# needed; the common likelihood score cancels.
-score_prior_ref <- function(draws) {
-  theta <- draws[, "theta"]
-  matrix((prior_mean_ref - theta) / prior_sd_ref^2, ncol = 1)
-}
-
-score_prior_candidate <- function(draws, lambda) {
-  theta <- draws[, "theta"]
-  candidate_mean <- lambda["prior_mean"]
-  candidate_sd <- lambda["prior_sd"]
-  matrix((candidate_mean - theta) / candidate_sd^2, ncol = 1)
-}
-
+# The Stan statement `theta ~ normal(prior_mean, prior_sd)` is detected as an
+# exponential-family prior. Bounds are therefore supplied in natural
+# parameters lambda1 = mu / sigma^2 and lambda2 = -1 / (2 sigma^2).
 prior_result <- fd_prior_global_sensitivity(
   fit = fit,
   variables = "theta",
-  lower = c(prior_mean = -2, prior_sd = 0.5),
-  upper = c(prior_mean = 2, prior_sd = 4),
-  score_prior_ref = score_prior_ref,
-  score_prior_candidate = score_prior_candidate
+  lambda_lower = c(lambda1 = -1, lambda2 = -2),
+  lambda_upper = c(lambda1 = 1, lambda2 = -0.05),
+  stan_file = stan_file,
+  prior_variable = "theta",
+  stan_data = list(prior_mean = prior_mean_ref, prior_sd = prior_sd_ref)
 )
 print(prior_result)

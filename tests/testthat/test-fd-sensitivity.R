@@ -60,8 +60,9 @@ test_that("fd_prior_global_sensitivity finds the gaussian-prior endpoints", {
   result <- fd_prior_global_sensitivity(
     fit,
     variables = "theta",
-    lower = -2,
-    upper = 2,
+    lambda_lower = -2,
+    lambda_upper = 2,
+    method = "black_box",
     score_prior_ref = score_prior_ref,
     score_prior_candidate = score_prior_candidate
   )
@@ -87,8 +88,9 @@ test_that("fd_prior_global_sensitivity supports a 2-D hyperparameter search", {
   result <- fd_prior_global_sensitivity(
     fit,
     variables = "theta",
-    lower = lower,
-    upper = upper,
+    lambda_lower = lower,
+    lambda_upper = upper,
+    method = "black_box",
     score_prior_candidate = score_prior_candidate,
     score_prior_ref = function(x) -x
   )
@@ -127,8 +129,9 @@ test_that("fd_prior_global_sensitivity supports named hyperparameter bounds", {
   result <- fd_prior_global_sensitivity(
     fit,
     variables = "theta",
-    lower = c(mean = -2, sd = 0.5),
-    upper = c(sd = 2, mean = 2), # deliberately different order than `lower`
+    lambda_lower = c(mean = -2, sd = 0.5),
+    lambda_upper = c(sd = 2, mean = 2), # deliberately different order
+    method = "black_box",
     score_prior_candidate = score_prior_candidate,
     score_prior_ref = function(x) -x
   )
@@ -148,12 +151,94 @@ test_that("fd_prior_global_sensitivity rejects mismatched bound names", {
     fd_prior_global_sensitivity(
       fit,
       variables = "theta",
-      lower = c(mean = -2, sd = 0.5),
-      upper = c(mean = 2, scale = 2),
+      lambda_lower = c(mean = -2, sd = 0.5),
+      lambda_upper = c(mean = 2, scale = 2),
+      method = "black_box",
       score_prior_ref = function(x) -x,
       score_prior_candidate = function(x, lambda) -x
     ),
     "same hyperparameter names"
+  )
+})
+
+test_that("automatic normal route builds the quadratic and checks corners", {
+  set.seed(4)
+  theta <- rnorm(100)
+  draws <- matrix(theta, ncol = 1, dimnames = list(NULL, "theta"))
+  fit <- mock_cmdstan_fit(draws, grad_fun = function(u) -u)
+  stan_file <- tempfile(fileext = ".stan")
+  writeLines(
+    c(
+      "data { real prior_mean; real prior_sd; }",
+      "parameters { real theta; }",
+      "model { theta ~ normal(prior_mean, prior_sd); }"
+    ),
+    stan_file
+  )
+
+  lower <- c(lambda1 = -1, lambda2 = -1)
+  upper <- c(lambda1 = 1, lambda2 = -0.05)
+  result <- fd_prior_global_sensitivity(
+    fit,
+    variables = "theta",
+    lambda_lower = lower,
+    lambda_upper = upper,
+    stan_file = stan_file,
+    prior_variable = "theta",
+    stan_data = list(prior_mean = 0, prior_sd = 2)
+  )
+
+  expect_identical(result$optimization, "quadratic_corner")
+  expect_identical(result$prior_family, "normal")
+  expect_equal(result$reference_natural_parameters, c(lambda1 = 0, lambda2 = -0.125))
+  expect_equal(nrow(result$corners), 4)
+  expect_equal(result$fd_max, max(result$corner_fd))
+  expect_equal(result$fd_min, 0)
+  expect_equal(unname(result$A), crossprod(cbind(1, 2 * theta)) / length(theta))
+})
+
+test_that("auto route falls back for an unsupported Stan prior", {
+  draws <- matrix(c(-1, 0, 1), ncol = 1, dimnames = list(NULL, "theta"))
+  fit <- mock_cmdstan_fit(draws, grad_fun = function(u) -u)
+  stan_file <- tempfile(fileext = ".stan")
+  writeLines(
+    "parameters { real theta; } model { theta ~ student_t(4, 0, 1); }",
+    stan_file
+  )
+
+  result <- fd_prior_global_sensitivity(
+    fit,
+    variables = "theta",
+    lambda_lower = -1,
+    lambda_upper = 1,
+    stan_file = stan_file,
+    prior_variable = "theta",
+    score_prior_ref = function(x) -x,
+    score_prior_candidate = function(x, lambda) lambda - x
+  )
+
+  expect_identical(result$optimization, "black_box")
+  expect_false(result$detection$supported)
+  expect_match(result$detection$reason, "not in the supported registry")
+})
+
+test_that("quadratic route rejects original-parameter-style normal bounds", {
+  draws <- matrix(c(-1, 0, 1), ncol = 1, dimnames = list(NULL, "theta"))
+  fit <- mock_cmdstan_fit(draws, grad_fun = function(u) -u)
+  stan_file <- tempfile(fileext = ".stan")
+  writeLines("parameters { real theta; } model { theta ~ normal(0, 2); }", stan_file)
+
+  expect_error(
+    fd_prior_global_sensitivity(
+      fit,
+      variables = "theta",
+      lambda_lower = c(mean = -2, sd = 0.5),
+      lambda_upper = c(mean = 2, sd = 4),
+      method = "quadratic",
+      stan_file = stan_file,
+      prior_variable = "theta"
+    ),
+    "Natural-parameter bounds must be named"
   )
 })
 

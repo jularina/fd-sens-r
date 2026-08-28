@@ -105,6 +105,9 @@ print.fd_sensitivity_result <- function(x, ...) {
     "FD prior sensitivity"
   }
   cat(label, "\n")
+  if (!is.null(x$optimization)) {
+    cat("  optimisation:", x$optimization, "\n")
+  }
   cat("  sensitivity:", format(x$sensitivity, digits = 6L), "\n")
   cat("  minimum FD: ", format(x$fd_min, digits = 6L),
       "at lambda =", format_lambda(x$lambda_min), "\n")
