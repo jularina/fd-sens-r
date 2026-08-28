@@ -1,4 +1,4 @@
-# Minimal cmdstanr example: sensitivity to the prior mean and sd jointly.
+# Minimal cmdstanr example: prior sensitivity.
 
 library(cmdstanr)
 library(fdsens)
@@ -26,26 +26,26 @@ fit <- model$sample(
   refresh = 0
 )
 
-# `theta` is unconstrained, so the reference score does not need to be
-# supplied by hand: fd_global_sensitivity() derives it from the fit's own
-# log-density gradient.
+# For prior sensitivity the likelihood is fixed, so only prior scores are
+# needed; the common likelihood score cancels.
+score_prior_ref <- function(draws) {
+  theta <- draws[, "theta"]
+  matrix((prior_mean_ref - theta) / prior_sd_ref^2, ncol = 1)
+}
 
-score_candidate <- function(draws, lambda) {
+score_prior_candidate <- function(draws, lambda) {
   theta <- draws[, "theta"]
   candidate_mean <- lambda["prior_mean"]
   candidate_sd <- lambda["prior_sd"]
-  matrix(
-    sum(y) - length(y) * theta + (candidate_mean - theta) / candidate_sd^2,
-    ncol = 1
-  )
+  matrix((candidate_mean - theta) / candidate_sd^2, ncol = 1)
 }
 
-result <- fd_global_sensitivity(
+prior_result <- fd_prior_global_sensitivity(
   fit = fit,
   variables = "theta",
   lower = c(prior_mean = -2, prior_sd = 0.5),
   upper = c(prior_mean = 2, prior_sd = 4),
-  score_candidate = score_candidate
+  score_prior_ref = score_prior_ref,
+  score_prior_candidate = score_prior_candidate
 )
-
-print(result)
+print(prior_result)

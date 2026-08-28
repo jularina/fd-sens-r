@@ -1,5 +1,5 @@
 export(as_reference_draws)
-export(fd_global_sensitivity)
+export(fd_lr_global_sensitivity)
+export(fd_prior_global_sensitivity)
 export(fd_sensitivity)
 S3method(print,fd_sensitivity_result)
-

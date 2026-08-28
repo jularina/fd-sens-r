@@ -30,25 +30,3 @@ fd_sensitivity <- function(fit, variables, score_candidate, lambda, score_ref = 
 
   mean(rowSums((ref - candidate)^2))
 }
-
-validate_scores <- function(scores, draws, name) {
-  if (is.vector(scores) && ncol(draws) == 1L && length(scores) == nrow(draws)) {
-    scores <- matrix(scores, ncol = 1L)
-  }
-
-  if (!is.matrix(scores) || !is.numeric(scores)) {
-    stop("`", name, "` must return a numeric matrix.", call. = FALSE)
-  }
-  if (!identical(dim(scores), dim(draws))) {
-    stop(
-      "`", name, "` must return one score vector per draw, with dimensions ",
-      nrow(draws), " by ", ncol(draws), ".",
-      call. = FALSE
-    )
-  }
-  if (any(!is.finite(scores))) {
-    stop("`", name, "` returned non-finite scores.", call. = FALSE)
-  }
-
-  scores
-}

@@ -47,21 +47,23 @@ test_that("fd_sensitivity rejects an automatic score_ref for constrained variabl
   )
 })
 
-test_that("fd_global_sensitivity finds the gaussian-prior endpoints", {
+test_that("fd_prior_global_sensitivity finds the gaussian-prior endpoints", {
   set.seed(1)
   theta <- rnorm(100)
   draws <- matrix(theta, ncol = 1, dimnames = list(NULL, "theta"))
   prior_sd <- 2
   fit <- mock_cmdstan_fit(draws, grad_fun = function(u) -u / prior_sd^2)
 
-  score_candidate <- function(x, lambda) (lambda - x) / prior_sd^2
+  score_prior_ref <- function(x) -x / prior_sd^2
+  score_prior_candidate <- function(x, lambda) (lambda - x) / prior_sd^2
 
-  result <- fd_global_sensitivity(
+  result <- fd_prior_global_sensitivity(
     fit,
     variables = "theta",
     lower = -2,
     upper = 2,
-    score_candidate = score_candidate
+    score_prior_ref = score_prior_ref,
+    score_prior_candidate = score_prior_candidate
   )
 
   expect_s3_class(result, "fd_sensitivity_result")
@@ -71,24 +73,24 @@ test_that("fd_global_sensitivity finds the gaussian-prior endpoints", {
   expect_equal(abs(result$lambda_max), 2, tolerance = 1e-4)
 })
 
-test_that("fd_global_sensitivity supports a 2-D hyperparameter search", {
+test_that("fd_prior_global_sensitivity supports a 2-D hyperparameter search", {
   set.seed(2)
   theta <- rnorm(100)
   draws <- matrix(theta, ncol = 1, dimnames = list(NULL, "theta"))
   fit <- mock_cmdstan_fit(draws, grad_fun = function(u) -u)
 
-  score_candidate <- function(x, lambda) (lambda[1] - x) / lambda[2]^2
+  score_prior_candidate <- function(x, lambda) (lambda[1] - x) / lambda[2]^2
 
   lower <- c(-2, 0.5)
   upper <- c(2, 2)
 
-  result <- fd_global_sensitivity(
+  result <- fd_prior_global_sensitivity(
     fit,
     variables = "theta",
     lower = lower,
     upper = upper,
-    score_candidate = score_candidate,
-    score_ref = function(x) -x
+    score_prior_candidate = score_prior_candidate,
+    score_prior_ref = function(x) -x
   )
 
   expect_s3_class(result, "fd_sensitivity_result")
@@ -110,25 +112,25 @@ test_that("fd_global_sensitivity supports a 2-D hyperparameter search", {
   expect_equal(result$fd_max, max(corner_fd), tolerance = 1e-6)
 })
 
-test_that("fd_global_sensitivity supports named hyperparameter bounds", {
+test_that("fd_prior_global_sensitivity supports named hyperparameter bounds", {
   set.seed(2)
   theta <- rnorm(100)
   draws <- matrix(theta, ncol = 1, dimnames = list(NULL, "theta"))
   fit <- mock_cmdstan_fit(draws, grad_fun = function(u) -u)
 
   seen_names <- NULL
-  score_candidate <- function(x, lambda) {
+  score_prior_candidate <- function(x, lambda) {
     seen_names <<- names(lambda)
     (lambda["mean"] - x) / lambda["sd"]^2
   }
 
-  result <- fd_global_sensitivity(
+  result <- fd_prior_global_sensitivity(
     fit,
     variables = "theta",
     lower = c(mean = -2, sd = 0.5),
     upper = c(sd = 2, mean = 2), # deliberately different order than `lower`
-    score_candidate = score_candidate,
-    score_ref = function(x) -x
+    score_prior_candidate = score_prior_candidate,
+    score_prior_ref = function(x) -x
   )
 
   expect_setequal(seen_names, c("mean", "sd"))
@@ -136,20 +138,65 @@ test_that("fd_global_sensitivity supports named hyperparameter bounds", {
   expect_named(result$lambda_max, c("mean", "sd"))
 })
 
-test_that("fd_global_sensitivity rejects mismatched bound names", {
+test_that("fd_prior_global_sensitivity rejects mismatched bound names", {
   fit <- mock_cmdstan_fit(
     matrix(0, ncol = 1, dimnames = list(NULL, "theta")),
     grad_fun = function(u) -u
   )
 
   expect_error(
-    fd_global_sensitivity(
+    fd_prior_global_sensitivity(
       fit,
       variables = "theta",
       lower = c(mean = -2, sd = 0.5),
       upper = c(mean = 2, scale = 2),
-      score_candidate = function(x, lambda) -x
+      score_prior_ref = function(x) -x,
+      score_prior_candidate = function(x, lambda) -x
     ),
     "same hyperparameter names"
   )
+})
+
+test_that("fd_lr_global_sensitivity uses the analytic learning-rate objective", {
+  theta <- c(-1, 0, 2)
+  draws <- matrix(theta, ncol = 1, dimnames = list(NULL, "theta"))
+  fit <- mock_cmdstan_fit(draws, grad_fun = function(u) -u)
+  score_loss <- function(x) 2 * x
+
+  result <- fd_lr_global_sensitivity(
+    fit,
+    variables = "theta",
+    lambda_ref = 1,
+    lower = 0.5,
+    upper = 2,
+    score_loss = score_loss
+  )
+
+  energy <- mean((2 * theta)^2)
+  expect_equal(result$fd_min, 0)
+  expect_equal(result$fd_max, energy)
+  expect_equal(result$sensitivity, energy)
+  expect_equal(unname(result$lambda_min), 1)
+  expect_equal(unname(result$lambda_max), 2)
+  expect_identical(result$analysis, "learning_rate")
+})
+
+test_that("fd_lr_global_sensitivity handles a reference rate outside the interval", {
+  draws <- matrix(c(-1, 1), ncol = 1, dimnames = list(NULL, "theta"))
+  fit <- mock_cmdstan_fit(draws, grad_fun = function(u) -u)
+
+  result <- fd_lr_global_sensitivity(
+    fit,
+    variables = "theta",
+    lambda_ref = 3,
+    lower = 0.5,
+    upper = 2,
+    score_loss = function(x) x
+  )
+
+  expect_equal(unname(result$lambda_min), 2)
+  expect_equal(unname(result$lambda_max), 0.5)
+  expect_equal(result$fd_min, 1)
+  expect_equal(result$fd_max, 6.25)
+  expect_equal(result$sensitivity, 5.25)
 })
