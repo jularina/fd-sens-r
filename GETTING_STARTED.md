@@ -43,22 +43,14 @@ A value of zero means that the candidate and reference posteriors coincide. Larg
 
 For any candidate $\lambda$, the FD is estimated using the reference-posterior samples:
 $$
-\widehat{\mathrm{FD}}_m
-(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda)=
-\frac{1}{m}\sum_{i=1}^m\left\|s_{\widetilde\pi_{\mathrm{ref}}}(\theta_i)-s_{\widetilde\pi^\lambda}(\theta_i)\right\|^2.
+\widehat{\mathrm{FD}}_m(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda)=\frac{1}{m}\sum_{i=1}^m\left\|s_{\widetilde\pi_{\mathrm{ref}}}(\theta_i)-s_{\widetilde\pi^\lambda}(\theta_i)\right\|^2.
 $$
 The same reference samples are reused for every candidate. Evaluating a new candidate therefore requires score evaluations but not a new posterior fit.
 
 For the global sensitivity value, the method searches $\Gamma$ for the candidate with the largest estimated FD and the candidate with the smallest estimated FD. The global sensitivity value is their difference:
 
 $$
-\widehat{S}_m^{\mathrm{FD}}(\Gamma)
-=
-\sup_{\lambda\in\Gamma}
-\widehat{\mathrm{FD}}_m
-(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda) -\inf_{\lambda\in\Gamma}
-\widehat{\mathrm{FD}}_m
-(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda).
+\widehat{S}_m^{\mathrm{FD}}(\Gamma)=\sup_{\lambda\in\Gamma}\widehat{\mathrm{FD}}_m(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda)-\inf_{\lambda\in\Gamma}\widehat{\mathrm{FD}}_m(\widetilde\Pi_{\mathrm{ref}}\|\widetilde\Pi^\lambda).
 $$
 
 ## Requirements

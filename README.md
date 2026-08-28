@@ -90,6 +90,8 @@ See [`GETTING_STARTED.md`](GETTING_STARTED.md) for the underlying methodology.
 
 [`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R) demonstrates the fit-comparison helpers: after `fd_prior_global_sensitivity()` it refits the Stan model at the worst-case `lambda_max` and calls `save_sensitivity_result()`, `plot_quantiles()`, `plot_kde()`, and `plot_ecdf()`. [`examples/kilpisjarvi_ar5_independent_prior_sensitivity.R`](examples/kilpisjarvi_ar5_independent_prior_sensitivity.R) demonstrates all five helpers on the independent-block decomposition: `plot_component_shares()` visualises each block's sensitivity share, and after inverting every block's own worst-case `lambda_max` back to its original Stan parameterisation and refitting (against [`inst/stan/kilpisjarvi_ar5_candidate.stan`](inst/stan/kilpisjarvi_ar5_candidate.stan), which takes those prior hyperparameters as data), `plot_quantiles()`/`plot_kde()`/`plot_ecdf()` compare the reference and worst-case posteriors across `alpha`, `beta[1:5]`, and `sigma`. Requires the `ggplot2`, `jsonlite`, and `posterior` packages.
 
+[`notebooks/gaussian_location_prior_sensitivity.Rmd`](notebooks/gaussian_location_prior_sensitivity.Rmd) walks through the same Gaussian-location workflow as a narrated R Markdown notebook, with the quantile table and both plots rendered inline. Knit it with `rmarkdown::render()` (requires `rmarkdown`, `knitr`, and `rprojroot`, plus a Pandoc installation).
+
 ## Contributing
 
 1. For the exponential-family route contributions adding more families are welcome: extend `stan_prior_registry()` in [`R/stan_exponential_family_priors.R`](R/stan_exponential_family_priors.R) with a new entry keyed by the Stan distribution name, providing:
