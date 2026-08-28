@@ -1,0 +1,16 @@
+Package: fdsens
+Title: Fisher Divergence Global Sensitivity Analysis
+Version: 0.0.1
+Authors@R: person("Arina", "Odnoblyudova", email = "arina.odnoblyudova@remedylogic.com", role = c("aut", "cre"))
+Description: A minimal implementation of Fisher divergence global sensitivity
+    analysis for sampling-based Bayesian inference. The package reuses draws
+    from one reference posterior and user-supplied posterior score functions.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Suggests:
+    cmdstanr,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+

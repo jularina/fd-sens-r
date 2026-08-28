@@ -1,0 +1,13 @@
+# R
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rcheck/
+inst/doc
+
+# IDE
+.idea/
+
+# OS
+.DS_Store
