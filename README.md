@@ -1,4 +1,4 @@
-# fd-sens (R extension)
+# fd-sens (R/Stan-based)
 
 This is a minimal R package for Fisher-divergence global sensitivity analysis using a reference posterior fitted with Stan.
 
@@ -12,29 +12,30 @@ install.packages(".", repos = NULL, type = "source")
 
 Install `cmdstanr` and CmdStan separately by following the [`cmdstanr` installation guide](https://mc-stan.org/cmdstanr/articles/cmdstanr.html).
 
-## Prior sensitivity
+## Prior Sensitivity
 
 `fd_prior_global_sensitivity()` has two computational routes.
 
 ### Exponential-family route
 
 With `method = "auto"` (the default), the package inspects a direct prior statement in the supplied Stan program
-and if it belongs to exponential family distributions listed below:
+and if it belongs to supported exponential family distributions listed below:
 
 - `normal(mu, sigma)`,
 - `gamma(alpha, beta)`,
 - `beta(alpha, beta)`.
 
-Use `stan_exponential_family_priors()` to see their natural parameters and sufficient statistics. 
-
-In this case, optimisation is performed using `optimization = "quadratic_corner"` route. See Proposition 2 in the paper.
+In this case, optimisation is performed using `optimization = "quadratic_corner"` route. 
+If you are sure that the distribution is exponential family and is in the supported distributions - 
+directly pass `method = "quadratic"`.
 
 ### Black-box route
 
 If the prior cannot be classified as exponential family safely, `method = "auto"` uses 
-the black-box optimisation algorithm `optimization = "black_box"`.
+the black-box optimisation algorithm `optimization = "black_box"`. If you are sure that the distribution isn't an exponential family or is not in the supported distributions - 
+directly pass `method = "black_box"`.
 
-## Sensitivity to independent prior components
+## Sensitivity to Independent Prior Components
 
 If the reference and candidate priors both factorise into disjoint parameter blocks and the candidate region is a Cartesian product across those blocks, set `independent = TRUE` and pass a named `blocks` list instead of `variables`/`lambda_lower`/`lambda_upper`. 
 The total minimum, maximum, and sensitivity are just the sums of each block's own minimum, maximum, and sensitivity, so each block is optimised on its own.
@@ -43,7 +44,7 @@ Each block is resolved exactly like a standalone call to `fd_prior_global_sensit
 The result is an `fd_sensitivity_decomposition` (which also inherits `fd_sensitivity_result`): `sensitivity`, `fd_min`, `fd_max`, `lambda_min`, and `lambda_max` are the totals (`lambda_min`/`lambda_max` are named lists, one entry per block),
 and `components` is a data frame with one row per block giving its own `sensitivity`, `fd_min`, `fd_max`, and `sensitivity_share`.
 
-## Learning-rate sensitivity
+## Learning-Rate Sensitivity
 
 `fd_lr_global_sensitivity()` computes the learning-rate sensitivity.
 
@@ -71,23 +72,29 @@ and `components` is a data frame with one row per block giving its own `sensitiv
 
 See [`GETTING_STARTED.md`](GETTING_STARTED.md) for the underlying methodology.
 
-## Complete examples
+## Examples
 
-- [`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R): automatic Gaussian quadratic route, then interprets the result (see below);
-- [`examples/gaussian_location_prior_sensitivity_multidim.R`](examples/gaussian_location_prior_sensitivity_multidim.R): explicit black-box route;
+- [`examples/gaussian_location_prior_sensitivity.R`](examples/gaussian_location_prior_sensitivity.R): prior sensitivity for Gaussian location model (simplest example);
+- [`notebooks/gaussian_location_prior_sensitivity.md`](notebooks/gaussian_location_prior_sensitivity.md) walks through the same Gaussian-location as above.
+- [`examples/gaussian_location_prior_sensitivity_multidim.R`](examples/gaussian_location_prior_sensitivity_multidim.R): prior sensitivity for multidimensional Gaussian location model;
 - [`examples/gaussian_location_lr_sensitivity.R`](examples/gaussian_location_lr_sensitivity.R): learning-rate sensitivity;
-- [`examples/kilpisjarvi_ar5_independent_prior_sensitivity.R`](examples/kilpisjarvi_ar5_independent_prior_sensitivity.R): `rstan` AR(5) analysis with independent-prior decomposition, then interprets the result (see below).
-- [`notebooks/gaussian_location_prior_sensitivity.md`](notebooks/gaussian_location_prior_sensitivity.md) walks through the same Gaussian-location workflow as a narrated notebook, with the printed sensitivity result.
+- [`examples/kilpisjarvi_ar5_independent_prior_sensitivity.R`](examples/kilpisjarvi_ar5_independent_prior_sensitivity.R): `rstan` sensitivity to independent prior components.
 
-## Interpreting results
+Run any example file from the command line with `Rscript`, e.g.:
 
-[`interpretation/plots.R`](interpretation/plots.R) provides reusable helpers, writing output into a directory:
+```sh
+Rscript examples/gaussian_location_prior_sensitivity.R
+```
+
+## Interpreting Results
+
+[`interpretation/plots.R`](interpretation/plots.R) provides reusable helpers to interpret the results:
 
 - `save_sensitivity_result(result, output_dir)` — writes an `fd_sensitivity_result`'s (or `fd_sensitivity_decomposition`'s) values (`sensitivity`, `lambda_min`/`lambda_max`, `fd_min`/`fd_max`, `interval`, `analysis`, ...) as a JSON dict, leaving out draw-level fields at every nesting level;
 - `plot_quantiles(fits, variables, output_dir)` — writes a posterior-quantile table (`.csv`) and a median/90%-interval plot (`.png`) comparing a named list of `CmdStanMCMC` or `stanfit` fits (e.g. `list(reference = ref_fit, candidate = cand_fit)`);
 - `plot_kde(fits, variables, output_dir)` — writes a kernel density estimate comparison (`.png`) across those fits;
 - `plot_ecdf(fits, variables, output_dir)` — writes an empirical CDF comparison (`.png`) across those fits;
-- `plot_component_shares(result, output_dir)` — for an `fd_sensitivity_decomposition` (from `independent = TRUE`), writes a 100%-stacked bar (`.png`) showing each block's percentage share of the total sensitivity.
+- `plot_component_shares(result, output_dir)` — for an `fd_sensitivity_decomposition`, writes a 100%-stacked bar (`.png`) showing each block's percentage share of the total sensitivity.
 
 ## Contributing
 
