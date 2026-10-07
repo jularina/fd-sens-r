@@ -70,8 +70,8 @@ print(prior_result)
 #> FD prior sensitivity 
 #>   optimisation: quadratic_corner 
 #>   sensitivity: 20.976 
-#>   minimum FD:  0 at lambda = (eta1 = 0, eta2 = -0.125) 
-#>   maximum FD:  20.976 at lambda = (eta1 = -1, eta2 = -2)
+#>   minimum FD:  0 at lambda_min = (eta1 = 0, eta2 = -0.125) 
+#>   maximum FD:  20.976 at lambda_max = (eta1 = -1, eta2 = -2)
 ```
 
 `prior_result$sensitivity` is the global sensitivity value: the largest

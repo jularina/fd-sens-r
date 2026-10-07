@@ -4,11 +4,10 @@
 
 Bayesian inference can be sensitive to choices made by the modeller, such as the parameters of the prior or the weight assigned to the likelihood or loss. A sensitivity analysis asks whether plausible alternative choices would lead to substantially different posterior conclusions.
 
-This approach performs **global Bayesian sensitivity analysis** using the Fisher divergence (FD). The method is designed to answer three practical questions:
+This approach performs **global Bayesian sensitivity analysis** using the Fisher divergence (FD). The method is designed to answer two practical questions:
 
 1. How much can the posterior change over the specified range of modelling choices?
 2. Which hyperparameter choice produces the largest change?
-3. Which choice produces the smallest change?
 
 ## Reference Bayesian model
 

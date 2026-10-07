@@ -110,8 +110,8 @@ print.fd_sensitivity_result <- function(x, ...) {
   }
   cat("  sensitivity:", format(x$sensitivity, digits = 6L), "\n")
   cat("  minimum FD: ", format(x$fd_min, digits = 6L),
-      "at lambda =", format_lambda(x$lambda_min), "\n")
+      "at lambda_min =", format_lambda(x$lambda_min), "\n")
   cat("  maximum FD: ", format(x$fd_max, digits = 6L),
-      "at lambda =", format_lambda(x$lambda_max), "\n")
+      "at lambda_max =", format_lambda(x$lambda_max), "\n")
   invisible(x)
 }
